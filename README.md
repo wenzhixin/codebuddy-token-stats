@@ -28,12 +28,15 @@ consume?"*.
 
 - **4 data sources on macOS, 2 on Linux** (WorkBuddy is macOS-only),
   auto-discovered per OS (missing ones are skipped)
+- **Remote hosts over SSH** — merge usage from your servers into one report,
+  no deployment needed on the remote side
 - **Per-model** input / output / total / cache-hit tokens and request counts
 - Group by **source**, **day** or **month**; filter with `--since` / `--until`
 - **Deduplicated** by request ID, so the same request is never counted twice
 - **Readable Chinese units** (`7.94 亿`, `6.01 百万`, `84.64 万`)
 - **JSON output** with raw integers for scripting and dashboards
-- **Local & read-only** — no network calls, no data leaves your machine
+- **Local & read-only** — no data leaves your machines beyond the SSH hops you
+  configure
 
 ## Installation
 
@@ -79,6 +82,32 @@ vscode-workbuddy     存在   原始记录       19  /Users/you/Library/.../Work
 去重后记录数: 1.91 万
 ```
 
+## Remote hosts (SSH)
+
+Aggregate usage from remote servers together with local data — e.g. run the
+script on your Mac and merge in the Linux box you SSH into every day.
+
+Requirements: SSH key login (`BatchMode`) to the remote host and `python3`
+there. **Nothing needs to be installed or copied** — the script pipes itself
+over SSH, runs in a dump mode and merges the returned records locally. Remote
+sources show up as `host:source` (e.g. `myserver:codebuddy-cli`).
+
+Configure hosts in `~/.codebuddy-token-stats.json`:
+
+```json
+{"remotes": ["myserver", "user@another-server"]}
+```
+
+Or override per run:
+
+```bash
+./codebuddy-token-stats.py --remotes myserver            # ad-hoc host list
+./codebuddy-token-stats.py --no-remotes                  # local only
+```
+
+A host that is unreachable or fails to execute is skipped with a warning on
+stderr; the rest of the report is unaffected.
+
 ## Usage
 
 ```bash
@@ -89,6 +118,7 @@ vscode-workbuddy     存在   原始记录       19  /Users/you/Library/.../Work
 ./codebuddy-token-stats.py --by-day --sort-by-usage       # back to global usage order
 ./codebuddy-token-stats.py --sources codebuddy-cli,workbuddy --json
 ./codebuddy-token-stats.py --list-sources
+./codebuddy-token-stats.py --remotes myserver             # merge a remote host
 ```
 
 ## Options
@@ -105,6 +135,8 @@ vscode-workbuddy     存在   原始记录       19  /Users/you/Library/.../Work
 | `--sort-by-usage` | Sort globally by token usage instead of by date |
 | `--json` | Emit raw integers as JSON (unscaled, English keys) |
 | `--no-dedup` | Disable request-ID deduplication |
+| `--remotes <hosts>` | Comma-separated remote hosts, overrides the config file |
+| `--no-remotes` | Skip remote hosts, local data only |
 
 When `--by-day` / `--by-month` is used, rows are sorted by **date descending**,
 and within each date by **usage descending**. `--sort-by-usage` restores the
@@ -174,8 +206,9 @@ deepseek-v4.1-flash           1,809        2.10 亿     1.59 百万   2.11 亿  
 
 ## Privacy
 
-Everything runs locally and read-only. The script never makes a network request
-and never writes to the CodeBuddy data directories. Session contents are never
+Everything runs read-only. The script never writes to the CodeBuddy data
+directories and only talks to the hosts you configure in `--remotes` /
+`~/.codebuddy-token-stats.json`, over SSH. Session contents are never
 printed — only aggregated token counts.
 
 ## License

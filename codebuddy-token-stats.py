@@ -9,6 +9,11 @@
   workbuddy         ~/.workbuddy/projects/**/*.jsonl          (仅 mac)
   vscode-workbuddy  ~/Library/Application Support/WorkBuddyExtension/Data  (仅 mac)
 
+远程主机（可选，配置在 ~/.codebuddy-token-stats.json）：
+  {"remotes": ["server1", "user@server2"]}
+  通过 ssh 在远程执行本脚本（要求远程有 python3，无需拷贝文件），
+  远程来源显示为 "主机名:来源"，与本地记录合并去重后统一汇总。
+
 用法：
   codebuddy-token-stats.py                          # 按模型汇总全部来源
   codebuddy-token-stats.py --by-source              # 按来源分组
@@ -16,6 +21,8 @@
   codebuddy-token-stats.py --by-day --sort-by-usage  # 改回按用量倒序
   codebuddy-token-stats.py --sources codebuddy-cli,workbuddy --json
   codebuddy-token-stats.py --list-sources
+  codebuddy-token-stats.py --no-remotes              # 只统计本地
+  codebuddy-token-stats.py --remotes server1,server2 # 临时指定远程主机
 """
 import argparse
 import collections
@@ -23,6 +30,7 @@ import datetime as dt
 import glob
 import json
 import os
+import subprocess
 import sys
 import unicodedata
 
@@ -46,6 +54,18 @@ if IS_MAC:
         ("vscode-workbuddy",
          os.path.join(HOME, "Library", "Application Support", "WorkBuddyExtension", "Data"), "ide"),
     ]
+
+
+CONFIG_PATH = os.path.join(HOME, ".codebuddy-token-stats.json")
+
+
+def load_remotes():
+    with open(CONFIG_PATH, encoding="utf-8") as f:
+        cfg = json.load(f)
+    remotes = cfg.get("remotes", [])
+    if not isinstance(remotes, list):
+        raise ValueError(f"{CONFIG_PATH} 中 remotes 必须是数组")
+    return remotes
 
 
 ALIASES = {"hy4free": "hy4-free"}
@@ -188,6 +208,43 @@ def collect(selected, dedup=True):
     return records, file_counts
 
 
+SCRIPT_PATH = os.path.abspath(__file__)
+
+
+def fetch_remote(host, selected, timeout=120):
+    """ssh 到远程执行本脚本的 --dump-records 模式，取回原始记录。
+
+    远程只需有 python3，无需提前部署脚本。来源名加 "host:" 前缀以区分机器。
+    """
+    with open(SCRIPT_PATH, encoding="utf-8") as f:
+        script = f.read()
+    cmd = ["ssh", "-o", "BatchMode=yes", host, "python3", "-", "--dump-records",
+           "--sources", ",".join(sorted(selected)), "--no-remotes"]
+    try:
+        out = subprocess.run(cmd, input=script, capture_output=True, text=True,
+                             timeout=timeout)
+    except (subprocess.TimeoutExpired, OSError) as e:
+        print(f"警告：{host} 连接失败（{e}），已跳过", file=sys.stderr)
+        return [], {}
+    if out.returncode != 0:
+        err = (out.stderr or "").strip().splitlines()
+        print(f"警告：{host} 执行失败（{err[-1] if err else out.returncode}），已跳过",
+              file=sys.stderr)
+        return [], {}
+    try:
+        data = json.loads(out.stdout)
+    except ValueError:
+        print(f"警告：{host} 返回数据无法解析，已跳过", file=sys.stderr)
+        return [], {}
+    records = []
+    for rec in data.get("records", []):
+        rec = dict(rec)
+        rec["source"] = f"{host}:{rec['source']}"
+        records.append(rec)
+    counts = {f"{host}:{k}": v for k, v in data.get("sources", {}).items()}
+    return records, counts
+
+
 def aggregate(records, keys, since=None, until=None):
     out = collections.defaultdict(lambda: collections.defaultdict(int))
     for r in records:
@@ -318,10 +375,37 @@ def main():
     ap.add_argument("--sort-by-usage", action="store_true",
                     help="按全局使用量倒序排（默认：按日期倒序，同日内按用量倒序）")
     ap.add_argument("--no-dedup", action="store_true", help="不去重（默认按请求 ID 去重）")
+    ap.add_argument("--no-remotes", action="store_true",
+                    help="跳过远程主机，只统计本地")
+    ap.add_argument("--remotes", metavar="HOSTS",
+                    help="逗号分隔的远程主机，覆盖配置文件（如 server1,user@server2）")
+    ap.add_argument("--dump-records", action="store_true",
+                    help=argparse.SUPPRESS)  # 内部用：输出原始记录 JSON 供远程合并
     args = ap.parse_args()
 
     selected = set(args.sources.split(","))
+
+    if args.dump_records:
+        records, counts = collect(selected, dedup=not args.no_dedup)
+        print(json.dumps({"sources": counts, "records": records},
+                         ensure_ascii=False))
+        return
+
+    remotes = []
+    if args.remotes:
+        remotes = [h for h in args.remotes.split(",") if h]
+    elif not args.no_remotes and os.path.isfile(CONFIG_PATH):
+        try:
+            remotes = load_remotes()
+        except (OSError, ValueError) as e:
+            print(f"警告：读取配置失败（{e}），仅统计本地", file=sys.stderr)
+
     records, counts = collect(selected, dedup=not args.no_dedup)
+    for host in remotes:
+        # 远程只采集本地也选中的来源名（不含 host: 前缀）
+        recs, cnts = fetch_remote(host, selected)
+        records.extend(recs)
+        counts.update(cnts)
 
     if args.list_sources:
         for name, root, _ in SOURCES:

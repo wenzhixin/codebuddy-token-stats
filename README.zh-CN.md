@@ -25,12 +25,13 @@ CodeBuddy 自带的 `#/stats` 统计页只读 `~/.codebuddy/projects/`，也就�
 ## 特性
 
 - macOS 4 个、Linux 2 个数据源（WorkBuddy 仅 macOS 有），按系统自动发现，缺失的自动跳过
+- **SSH 远程主机合并统计**：把服务器的用量一起汇总，远程无需部署任何东西
 - **按模型**汇总输入 / 输出 / 合计 / 缓存命中 token 及请求数
 - 支持按**来源**、**日期**、**月份**分组，配合 `--since` / `--until` 过滤
 - 按请求 ID **去重**，同一请求不会被重复计入
 - **中文可读单位**（`7.94 亿`、`6.01 百万`、`84.64 万`），数字与单位之间留空格
 - `--json` 输出原始整数，方便接脚本或面板
-- **纯本地只读**：不发网络请求，数据不出本机
+- **只读、不出网**：除你配置的 SSH 主机外不发起任何网络请求，数据不出你的机器
 
 ## 安装
 
@@ -75,6 +76,30 @@ vscode-workbuddy     存在   原始记录       19  /Users/you/Library/.../Work
 去重后记录数: 1.91 万
 ```
 
+## 远程主机（SSH）
+
+把远程服务器的用量与本地一起汇总——比如在 Mac 上运行，把你天天 SSH 的
+Linux 服务器也统计进来。
+
+要求：到远程主机可免密登录（SSH key），远程装有 `python3`。**无需在远程
+安装或拷贝任何文件**——脚本把自己通过 SSH 管道传过去，以 dump 模式执行后
+把记录取回本地合并。远程来源显示为 `主机名:来源`（如 `myserver:codebuddy-cli`）。
+
+在 `~/.codebuddy-token-stats.json` 里配置主机：
+
+```json
+{"remotes": ["myserver", "user@another-server"]}
+```
+
+也可以临时指定：
+
+```bash
+./codebuddy-token-stats.py --remotes myserver            # 临时指定远程主机
+./codebuddy-token-stats.py --no-remotes                  # 只统计本地
+```
+
+某台主机连不上或执行失败时只在 stderr 打警告并跳过，不影响其余统计。
+
 ## 用法
 
 ```bash
@@ -85,6 +110,7 @@ vscode-workbuddy     存在   原始记录       19  /Users/you/Library/.../Work
 ./codebuddy-token-stats.py --by-day --sort-by-usage       # 切回全局按用量倒序
 ./codebuddy-token-stats.py --sources codebuddy-cli,workbuddy --json
 ./codebuddy-token-stats.py --list-sources
+./codebuddy-token-stats.py --remotes myserver             # 合并一台远程主机
 ```
 
 ## 参数
@@ -101,6 +127,8 @@ vscode-workbuddy     存在   原始记录       19  /Users/you/Library/.../Work
 | `--sort-by-usage` | 改为全局按用量倒序，不按日期排 |
 | `--json` | 输出原始整数 JSON（不缩放、英文键） |
 | `--no-dedup` | 关闭按请求 ID 去重 |
+| `--remotes <hosts>` | 逗号分隔远程主机，覆盖配置文件 |
+| `--no-remotes` | 跳过远程主机，只统计本地 |
 
 使用 `--by-day` / `--by-month` 时，**默认按日期倒序**，同一天内再按用量倒序；
 `--sort-by-usage` 可切回原来的全局用量倒序。表格和 `--json` 共用同一排序。
@@ -162,8 +190,9 @@ deepseek-v4.1-flash           1,809        2.10 亿     1.59 百万   2.11 亿  
 
 ## 隐私
 
-全程本地只读，不发任何网络请求，也不会写入 CodeBuddy 的数据目录。
-只输出聚合后的 token 数字，不会打印会话内容。
+全程只读，不会写入 CodeBuddy 的数据目录；除你在 `--remotes` /
+`~/.codebuddy-token-stats.json` 里配置的主机（走 SSH）外，不发起任何网络
+请求。只输出聚合后的 token 数字，不会打印会话内容。
 
 ## License
 
