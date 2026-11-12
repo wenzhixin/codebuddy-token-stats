@@ -24,7 +24,7 @@ CodeBuddy 自带的 `#/stats` 统计页只读 `~/.codebuddy/projects/`，也就�
 
 ## 特性
 
-- **4 个数据源**自动发现，缺失的自动跳过
+- macOS 4 个、Linux 2 个数据源（WorkBuddy 仅 macOS 有），按系统自动发现，缺失的自动跳过
 - **按模型**汇总输入 / 输出 / 合计 / 缓存命中 token 及请求数
 - 支持按**来源**、**日期**、**月份**分组，配合 `--since` / `--until` 过滤
 - 按请求 ID **去重**，同一请求不会被重复计入
@@ -52,16 +52,16 @@ ln -s "$PWD/codebuddy-token-stats.py" ~/bin/codebuddy-token-stats.py
 
 ## 数据源
 
-| 来源 | 默认路径（macOS） | 数据格式 |
-| --- | --- | --- |
-| `codebuddy-cli` | `~/.codebuddy/projects/**/*.jsonl` | 逐轮 `providerData.usage` + `providerData.model` |
-| `workbuddy` | `~/.workbuddy/projects/**/*.jsonl` | 同上，另兼容少量旧版 `input_tokens` 字段 |
-| `vscode-codebuddy` | `~/Library/Application Support/CodeBuddyExtension/Data` | 会话 `index.json` 里的 `requests[].usage` |
-| `vscode-workbuddy` | `~/Library/Application Support/WorkBuddyExtension/Data` | 同上 |
+| 来源 | macOS 路径 | Linux 路径 | 数据格式 |
+| --- | --- | --- | --- |
+| `codebuddy-cli` | `~/.codebuddy/projects/**/*.jsonl` | 同 macOS | 逐轮 `providerData.usage` + `providerData.model` |
+| `workbuddy` | `~/.workbuddy/projects/**/*.jsonl` | —（无此产品） | 同上，另兼容少量旧版 `input_tokens` 字段 |
+| `vscode-codebuddy` | `~/Library/Application Support/CodeBuddyExtension/Data` | `~/.config/CodeBuddyExtension/Data` | 会话 `index.json` 里的 `requests[].usage` |
+| `vscode-workbuddy` | `~/Library/Application Support/WorkBuddyExtension/Data` | —（无此产品） | 同上 |
 
-目前只配置了 macOS 路径。Windows（`%APPDATA%/CodeBuddy/...`）和 Linux
-（`$XDG_CONFIG_HOME/codebuddy/...`）目录结构一致，改脚本顶部的 `SOURCES`
-即可支持。
+按操作系统（`sys.platform`）自动选择路径。WorkBuddy 仅 macOS 有，Linux 下
+不注册这两个数据源。Windows（`%APPDATA%/CodeBuddy/...`）目录结构一致，
+改脚本顶部的 `SOURCES` 即可支持。
 
 用 `--list-sources` 查看本机发现了哪些数据源：
 
@@ -158,7 +158,7 @@ deepseek-v4.1-flash           1,809        2.10 亿     1.59 百万   2.11 亿  
   这是 API 计费口径，并非重复统计；「缓存命中」列可以看出其中多少走了 prompt cache。
 - VS Code IDE 源的缓存明细不完整，缓存命中数会比 CLI 源低。
 - 不计算美元成本——这些（多为国产）模型没有稳定公开的价格表。
-- 目前只配置了 macOS 路径，Linux / Windows 只需改 `SOURCES`。
+- 已内置 macOS 与 Linux 路径，Windows 只需改 `SOURCES`。
 
 ## 隐私
 

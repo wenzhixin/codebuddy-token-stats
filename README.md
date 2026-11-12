@@ -26,7 +26,8 @@ consume?"*.
 
 ## Features
 
-- **4 data sources**, auto-discovered (missing ones are skipped)
+- **4 data sources on macOS, 2 on Linux** (WorkBuddy is macOS-only),
+  auto-discovered per OS (missing ones are skipped)
 - **Per-model** input / output / total / cache-hit tokens and request counts
 - Group by **source**, **day** or **month**; filter with `--since` / `--until`
 - **Deduplicated** by request ID, so the same request is never counted twice
@@ -54,16 +55,17 @@ ln -s "$PWD/codebuddy-token-stats.py" ~/bin/codebuddy-token-stats.py
 
 ## Data sources
 
-| Source | Default path (macOS) | Format |
-| --- | --- | --- |
-| `codebuddy-cli` | `~/.codebuddy/projects/**/*.jsonl` | per-turn `providerData.usage` + `providerData.model` |
-| `workbuddy` | `~/.workbuddy/projects/**/*.jsonl` | same schema, plus a legacy `input_tokens` variant |
-| `vscode-codebuddy` | `~/Library/Application Support/CodeBuddyExtension/Data` | session `index.json` → `requests[].usage` |
-| `vscode-workbuddy` | `~/Library/Application Support/WorkBuddyExtension/Data` | same as above |
+| Source | macOS path | Linux path | Format |
+| --- | --- | --- | --- |
+| `codebuddy-cli` | `~/.codebuddy/projects/**/*.jsonl` | same as macOS | per-turn `providerData.usage` + `providerData.model` |
+| `workbuddy` | `~/.workbuddy/projects/**/*.jsonl` | — (not available) | same schema, plus a legacy `input_tokens` variant |
+| `vscode-codebuddy` | `~/Library/Application Support/CodeBuddyExtension/Data` | `~/.config/CodeBuddyExtension/Data` | session `index.json` → `requests[].usage` |
+| `vscode-workbuddy` | `~/Library/Application Support/WorkBuddyExtension/Data` | — (not available) | same as above |
 
-Only the macOS paths are wired up today. Windows (`%APPDATA%/CodeBuddy/...`) and
-Linux (`$XDG_CONFIG_HOME/codebuddy/...`) follow the same layout and can be added
-in the `SOURCES` list at the top of the script.
+Paths are selected automatically by OS (`sys.platform`). WorkBuddy is macOS-only
+and is not registered as a source on Linux. Windows paths
+(`%APPDATA%/CodeBuddy/...`) follow the same layout and can be added in the
+`SOURCES` list at the top of the script.
 
 Run `--list-sources` to see which ones were found on your machine:
 
@@ -168,7 +170,7 @@ deepseek-v4.1-flash           1,809        2.10 亿     1.59 百万   2.11 亿  
   numbers are lower than the CLI's.
 - No USD cost is computed — pricing for these (mostly Chinese) models is not
   publicly stable.
-- Only macOS paths are configured; Linux/Windows support is a small change in `SOURCES`.
+- macOS and Linux paths are built in; Windows support is a small change in `SOURCES`.
 
 ## Privacy
 

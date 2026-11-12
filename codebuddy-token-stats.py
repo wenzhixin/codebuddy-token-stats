@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 """统一统计 CodeBuddy 全系列 token 用量，按模型累计。
 
-数据源（自动发现，缺失的自动跳过）：
+数据源（按操作系统自动发现，缺失的自动跳过）：
   codebuddy-cli     ~/.codebuddy/projects/**/*.jsonl
-  workbuddy         ~/.workbuddy/projects/**/*.jsonl
-  vscode-codebuddy  ~/Library/Application Support/CodeBuddyExtension/Data
-  vscode-workbuddy  ~/Library/Application Support/WorkBuddyExtension/Data
+  vscode-codebuddy  mac: ~/Library/Application Support/CodeBuddyExtension/Data
+                    linux: ~/.config/CodeBuddyExtension/Data
+  workbuddy         ~/.workbuddy/projects/**/*.jsonl          (仅 mac)
+  vscode-workbuddy  ~/Library/Application Support/WorkBuddyExtension/Data  (仅 mac)
 
 用法：
   codebuddy-token-stats.py                          # 按模型汇总全部来源
@@ -26,17 +27,25 @@ import sys
 import unicodedata
 
 HOME = os.path.expanduser("~")
+IS_MAC = sys.platform == "darwin"
 
 SOURCES = [
     ("codebuddy-cli",
      os.path.join(HOME, ".codebuddy", "projects"), "jsonl"),
-    ("workbuddy",
-     os.path.join(HOME, ".workbuddy", "projects"), "jsonl"),
     ("vscode-codebuddy",
-     os.path.join(HOME, "Library", "Application Support", "CodeBuddyExtension", "Data"), "ide"),
-    ("vscode-workbuddy",
-     os.path.join(HOME, "Library", "Application Support", "WorkBuddyExtension", "Data"), "ide"),
+     os.path.join(HOME, ".config", "CodeBuddyExtension", "Data")
+     if sys.platform.startswith("linux")
+     else os.path.join(HOME, "Library", "Application Support", "CodeBuddyExtension", "Data"),
+     "ide"),
 ]
+
+if IS_MAC:
+    SOURCES += [
+        ("workbuddy",
+         os.path.join(HOME, ".workbuddy", "projects"), "jsonl"),
+        ("vscode-workbuddy",
+         os.path.join(HOME, "Library", "Application Support", "WorkBuddyExtension", "Data"), "ide"),
+    ]
 
 
 ALIASES = {"hy4free": "hy4-free"}
