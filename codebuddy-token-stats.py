@@ -68,7 +68,10 @@ def load_remotes():
     return remotes
 
 
-ALIASES = {"hy4free": "hy4-free"}
+ALIASES = {
+    "hy4free": "hy4-free",
+    "hy4flash-free": "hy4-flash-free",
+}
 
 
 def norm_model(m):
